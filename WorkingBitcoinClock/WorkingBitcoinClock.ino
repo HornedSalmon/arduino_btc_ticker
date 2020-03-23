@@ -2,8 +2,9 @@
 #include <FS.h>
 #include <ESP8266WiFi.h>
 #include <WiFiClientSecure.h>
-
 #include <ArduinoJson.h>
+
+
 // This sketch draw marquee text on your LED matrix using the hardware SPI driver Library by Bartosz Bielawski.
 // Example written 16.06.2017 by Marko Oette, www.oette.info 
 
@@ -108,16 +109,20 @@ byte font[128][8] = {
     {0x30, 0x70, 0x40, 0x41, 0x7F, 0x3F, 0x01, 0x00},/// 'J'
     {0x41, 0x7F, 0x7F, 0x08, 0x1C, 0x77, 0x63, 0x00},/// 'K'
     {0x41, 0x7F, 0x7F, 0x41, 0x40, 0x60, 0x70, 0x00},/// 'L'
-    {0x7F, 0x7F, 0x0E, 0x1C, 0x0E, 0x7F, 0x7F, 0x00},/// 'M'
-    {0x7F, 0x7F, 0x06, 0x0C, 0x18, 0x7F, 0x7F, 0x00},/// 'N'
-    {0x1C, 0x3E, 0x63, 0x41, 0x63, 0x3E, 0x1C, 0x00},/// 'O'
+    //{0x7F, 0x7F, 0x0E, 0x1C, 0x0E, 0x7F, 0x7F, 0x00},/// 'M'
+    {0x00,0x82,0xc6,0xaa,0x92,0x82,0x82,0x82}, // M
+    //{0x7F, 0x7F, 0x06, 0x0C, 0x18, 0x7F, 0x7F, 0x00},/// 'N'
+    {0x00,0x42,0x42,0x62,0x52,0x4a,0x46,0x42}, // N
+    //{0x1C, 0x3E, 0x63, 0x41, 0x63, 0x3E, 0x1C, 0x00},/// 'O'
+    {0x00,0x3c,0x42,0x42,0x42,0x42,0x44,0x38}, // O
     //{0x41, 0x7F, 0x7F, 0x49, 0x09, 0x0F, 0x06, 0x00},/// 'P'
     {0x00,0x78,0x44,0x44,0x48,0x70,0x40,0x40}, // P
     {0x1E, 0x3F, 0x21, 0x71, 0x7F, 0x5E, 0x00, 0x00},/// 'Q'
 //    {0x41, 0x7F, 0x7F, 0x09, 0x19, 0x7F, 0x66, 0x00},/// 'R'
     {0x00,0x78,0x44,0x44,0x78,0x50,0x48,0x44}, // R
     {0x26, 0x6F, 0x4D, 0x59, 0x73, 0x32, 0x00, 0x00},/// 'S'
-    {0x03, 0x41, 0x7F, 0x7F, 0x41, 0x03, 0x00, 0x00},/// 'T'
+    //{0x03, 0x41, 0x7F, 0x7F, 0x41, 0x03, 0x00, 0x00},/// 'T'
+    {0x00,0x7e,0x90,0x10,0x10,0x10,0x10,0x10}, // T
     {0x7F, 0x7F, 0x40, 0x40, 0x7F, 0x7F, 0x00, 0x00},/// 'U'
     {0x1F, 0x3F, 0x60, 0x60, 0x3F, 0x1F, 0x00, 0x00},/// 'V'
     //{0x7F, 0x7F, 0x30, 0x18, 0x30, 0x7F, 0x7F, 0x00},/// 'W'
@@ -230,7 +235,8 @@ double processJson(char *json);
 static char jsonBuf[4096];
 const int ANIM_DELAY = 20;
 const String API_KEY = "615430de-fe63-4d4d-8fc0-4c6d66bd8a8b";
-const char* host = "pro-api.coinmarketcap.com";
+//const char* host = "pro-api.coinmarketcap.com";
+const char* host = "api.coinbase.com";
 // Marquee text 
 
 
@@ -248,14 +254,12 @@ void loop()
     return;
   }
   else{
-    char api_error[] = "API";
-    drawHelper(api_error);
-    Serial.println("connection");    
+    //Serial.println("connection");    
   }
-  String endpoint = "/v1/cryptocurrency/quotes/latest?CMC_PRO_API_KEY=" + API_KEY + "&symbol=BTC&convert=USD";
-  client.print(String("GET ") + endpoint + " HTTP/1.1\r\n" +
+  //String endpoint = "/v1/cryptocurrency/quotes/latest?CMC_PRO_API_KEY=" + API_KEY + "&symbol=BTC&convert=USD";
+  //client.print(String("GET ") + endpoint + " HTTP/1.1\r\n" +
+  client.print(String("GET ") +"/v2/prices/BTC-USD/spot" + " HTTP/1.1\r\n" +
                "Host: " + host + "\r\n" + 
-               "User-Agent: ESP8266\r\n" +
                "Connection: close\r\n\r\n");
   if (client.println() == 0) {
     Serial.println("Failed to send request");
@@ -269,6 +273,10 @@ void loop()
   if (strcmp(httpStatus, "HTTP/1.1 200 OK") != 0) {
     Serial.print("Unexpected response: ");
     Serial.println(httpStatus);
+    if (strcmp(httpStatus, "HTTP/1.1 429 rate_limit_exceeded") == 0) {
+        char text[] = "TOO MANY";
+        drawHelper(text);
+    }
     return;
   }
     // skip HTTP headers
@@ -312,7 +320,7 @@ void loop()
  
  // Draw the text to the current position
  drawHelper(btc_price_char);
- delay(300000);
+ delay(7000);
  
 }
 float processJson(String response){ 
@@ -336,9 +344,8 @@ float processJson(String response){
     Serial.print("Error: ");
     Serial.println(statusErrorMessage);
   }
-  JsonObject coin = root["data"]["BTC"];
-  JsonObject quote = coin["quote"]["USD"];
-  float price = quote["price"];
+  JsonObject coin = root["data"];
+  float price = coin["amount"];
   Serial.print("Price: $");
   Serial.print(price);
   // Extracts the data in Euros
